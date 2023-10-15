@@ -1,6 +1,6 @@
 # test_3_13_5
 
-A new Flutter project.
+Flutter project for POC of notification grouping and scheduling from a headless background process.
 
 ## Getting Started
 
