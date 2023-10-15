@@ -8,7 +8,6 @@ import 'package:test_3_13_5/main.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 
-
 class NotificationService {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -20,54 +19,55 @@ class NotificationService {
   );
   final groupKeyName = 'some_key';
 
+  Future<void> initiliseNotificationServices() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp();
+    await FirebaseMessaging.instance.setAutoInitEnabled(true);
+    tz.initializeTimeZones();
 
-Future<void> initiliseNotificationServices() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await FirebaseMessaging.instance.setAutoInitEnabled(true);
-  tz.initializeTimeZones();
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    debugPrint('fcmToken: $fcmToken');
+    await notificationService.flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannelGroup(notificationService.channelGroup);
 
-  final fcmToken = await FirebaseMessaging.instance.getToken();
-  debugPrint('fcmToken: $fcmToken');
-  await notificationService.flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannelGroup(notificationService.channelGroup);
+    NotificationSettings settings =
+        await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
 
-  NotificationSettings settings =
-      await FirebaseMessaging.instance.requestPermission(
-    alert: true,
-    announcement: false,
-    badge: true,
-    carPlay: false,
-    criticalAlert: false,
-    provisional: false,
-    sound: true,
-  );
+    debugPrint('User granted permission: ${settings.authorizationStatus}');
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+    );
 
-  debugPrint('User granted permission: ${settings.authorizationStatus}');
-  const InitializationSettings initializationSettings = InitializationSettings(
-    android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-  );
+    await notificationService.flutterLocalNotificationsPlugin
+        .initialize(initializationSettings);
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  await notificationService.flutterLocalNotificationsPlugin
-      .initialize(initializationSettings);
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('Got a message whilst in the foreground!');
+      debugPrint('Message data: ${message.data}');
 
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    debugPrint('Got a message whilst in the foreground!');
-    debugPrint('Message data: ${message.data}');
+      if (message.notification != null) {
+        notificationService.showNotification(
+          message.notification!.title,
+          message.notification!.body,
+        );
+        debugPrint(
+            'Message also contained a notification: ${message.notification}');
+      }
+    });
+  }
 
-    if (message.notification != null) {
-      notificationService.showNotification(
-        message.notification!.title,
-        message.notification!.body,
-      );
-      debugPrint(
-          'Message also contained a notification: ${message.notification}');
-    }
-  });
-}
   Future<void> showNotification(
     String? title,
     String? body,
@@ -115,8 +115,8 @@ Future<void> initiliseNotificationServices() async {
           activeNotifications.map((e) => e.title.toString()).toList();
       InboxStyleInformation inboxStyleInformation = InboxStyleInformation(
         lines,
-        contentTitle: "${activeNotifications.length - 1} Updates",
-        summaryText: "${activeNotifications.length - 1} Updates",
+        contentTitle: "${activeNotifications.length} Updates",
+        summaryText: "${activeNotifications.length} Updates",
       );
       AndroidNotificationDetails groupNotificationDetails =
           AndroidNotificationDetails(
